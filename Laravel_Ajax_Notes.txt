@@ -1,0 +1,298 @@
+
+Laravel Shopping Cart Ajax
+==============================
+
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+
+welcome.blade.php
+
+<div class="product-image">
+       <a href="product-detail.html">
+       <img src="{{asset('images')}}/{{$p->photo}}" alt="Product Image">
+       </a>
+       <div class="product-action">
+           <a class="add-to-cart" data-id="{{$p->id}}" style="cursor:pointer"><i class="fa fa-cart-plus"></i></a>
+           <a href="#"><i class="fa fa-heart"></i></a>
+           <a href="#"><i class="fa fa-search"></i></a>
+        </div>
+    </div>
+  
+
+
+Cart.blade.php
+
+  @foreach(session('cart') as $id=>$detail)
+                  <tr>
+                     <td>
+                        <div class="img">
+                           <a href="#"><img src="{{asset('images')}}/{{$detail['photo']}}" alt="Image"></a>
+                          <p>{{$detail['name']}}</p>
+                           </div>
+                         </td>
+                        <td>{{$detail['price']}}</td>
+                        <td>
+                        <div class="qty">
+                        <a class="cart-decrease" data-id="{{$id}}" style="cursor:pointer"> <button class="btn-minus"><i class="fa fa-minus"></i></button></a>
+                        <input type="text" value="{{$detail['qty']}}">
+                        <a  class="cart-increase" data-id="{{$id}}" style="cursor:pointer"><button class="btn-plus"><i class="fa fa-plus"></i></button></a>
+                        </div>
+                        </td>
+                    <td>{{$detail['price'] * $detail['qty']}}</td>
+                    <td><a class="cart-remove" data-id="{{$id}}" style="cursor:pointer"><i class="fa fa-trash"></i></a></td>
+                </tr>
+           @endforeach
+
+
+
+===========================
+
+CartController
+--------------
+
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\Product;
+
+class CartController extends Controller
+{
+    public function addCart($id){
+
+
+
+        $product = Product::findOrFail($id);
+
+
+        $cart = session()->get('cart');
+        // if cart is empty then this the first product
+        if(!$cart) {
+            $cart = [
+                    $id => [
+                        "name" => $product->name,
+                        "qty" => 1,
+                        "price" => $product->price,
+                        "photo" => $product->photo
+                    ]
+            ];
+
+
+            session()->put('cart', $cart);
+            session()->flash('success', 'New Item Added successfully');
+
+        }
+
+
+        if(isset($cart[$id])) {
+
+            $cart[$id]['qty']++;
+
+            session()->put('cart', $cart);
+            session()->flash('success', 'New Item Added successfully');
+
+
+
+         }
+
+          // if item not exist in cart then add to cart with quantity = 1
+        $cart[$id] = [
+            "name" => $product->name,
+            "qty" => 1,
+            "price" => $product->price,
+            "photo" => $product->photo
+        ];
+
+
+        session()->put('cart', $cart);
+
+
+        session()->flash('success', 'New Item Added successfully');
+
+        }
+
+
+
+        public function list(){
+
+            return view('cart');
+        }
+
+        public function increase(Request $request){
+
+            $id=$request->id;
+
+            $cart = session()->get('cart');
+
+
+            $cart[$id]['qty']++;
+
+
+             session()->put('cart', $cart);
+
+
+
+        }
+
+        public function decrease(Request $request){
+
+            $id=$request->id;
+
+            $cart = session()->get('cart');
+
+            if(isset($cart[$id])) {
+
+                if($cart[$id]['qty']<=1){
+
+                    unset($cart[$id]);
+
+                }
+                else{
+
+                    $cart[$id]['qty']--;
+                }
+
+               }
+
+            session()->put('cart', $cart);
+
+
+
+        }
+
+        public function remove(Request $request){
+
+            $id=$request->id;
+
+            $cart = session()->get('cart');
+            unset($cart[$id]);
+            session()->put('cart', $cart);
+            session()->flash('success', 'Item Removed successfully');
+
+        }
+
+
+}
+
+
+=======================================
+
+Route
+web.php
+
+//Cart
+
+Route::get('add-cart/{id}',[CartController::class,'addCart'])->name('cart.add');
+Route::get('cart-list',[CartController::class,'list'])->name('cart.list');
+Route::patch('cart-increase',[CartController::class,'increase'])->name('cart.increase');
+Route::patch('cart-decrease',[CartController::class,'decrease'])->name('cart.decrease');
+Route::delete('cart-remove',[CartController::class,'remove'])->name('cart.remove');
+
+=========================================
+
+Add to Cart
+
+<script type="text/javascript">
+
+
+
+                $(".add-to-cart").click(function (e) {
+                    e.preventDefault();
+
+                    var ele = $(this);
+
+                   var id=ele.attr("data-id");
+                        $.ajax({
+                            url: 'add-cart/'+id,
+                            method: "GET",
+                            data: {
+                                _token: '{{ csrf_token() }}',
+
+                            },
+                            success: function (response) {
+                                window.location.reload();
+                            }
+                        });
+
+                });
+
+
+
+</script>
+
+
+Remove
+
+ <script type="text/javascript">
+      
+
+
+
+        $(".cart-remove").click(function (e) {
+            e.preventDefault();
+            var ele = $(this);
+
+                $.ajax({
+                    url: '{{ url('cart-remove') }}',
+                    method: "DELETE",
+                    data: {_token: '{{ csrf_token() }}', id: ele.attr("data-id")},
+                    success: function (response) {
+                        window.location.reload();
+                    }
+                });
+
+        });
+
+
+      /* cart increase */
+
+        $(".cart-increase").click(function (e) {
+            e.preventDefault();
+            var ele = $(this);
+
+                $.ajax({
+                    url: '{{ url('cart-increase') }}',
+                    method: "PATCH",
+                    data: {_token: '{{ csrf_token() }}', id: ele.attr("data-id")},
+                    success: function (response) {
+                        window.location.reload();
+                    }
+                });
+
+        });
+
+         /* cart decrease */
+
+         $(".cart-decrease").click(function (e) {
+            e.preventDefault();
+            var ele = $(this);
+
+                $.ajax({
+                    url: '{{ url('cart-decrease') }}',
+                    method: "PATCH",
+                    data: {_token: '{{ csrf_token() }}', id: ele.attr("data-id")},
+                    success: function (response) {
+                        window.location.reload();
+                    }
+                });
+
+        });
+
+
+
+
+
+
+
+
+            </script>
+
+
+
+
+
+
+
+===========================
+
+
